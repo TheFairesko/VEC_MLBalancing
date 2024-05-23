@@ -231,7 +231,7 @@ public class BasicEdgeOrchestrator extends EdgeOrchestrator {
 				hostCheckCounter++;
 			}
 		}
-		
+
 		return selectedVM;
 	}
 

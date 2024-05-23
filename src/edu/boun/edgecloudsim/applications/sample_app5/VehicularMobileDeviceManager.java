@@ -540,8 +540,34 @@ public class VehicularMobileDeviceManager extends MobileDeviceManager {
 		} else {
 			// SimLogger.printLine(CloudSim.clock() + ": Cloudlet#" + task.getCloudletId() +
 			// " is submitted to VM#" + task.getVmId());
+			
+			int vm_id = task.getVmId();
+			
 			schedule(getVmsToDatacentersMap().get(task.getVmId()), 0, CloudSimTags.CLOUDLET_SUBMIT, task);
-
+			
+			double utilization=0;
+			int ram=0;
+			double mips=0;
+			
+			
+			if(vmType == VM_TYPES.EDGE_VM) {
+				EdgeVM vm = SimManager.getInstance().getEdgeServerManager().getVmById(vm_id);
+				utilization = vm.getCloudletScheduler().getTotalUtilizationOfCpu(CloudSim.clock());
+				requiredCapacity=((VehicularCpuUtilizationModel) task.getUtilizationModelCpu()).predictUtilization(vm.getVmType());
+				utilization+=requiredCapacity;
+				ram=vm.getVmRam();
+				mips=vm.getVmMips();
+			}
+			else {
+				CloudVM vm = SimManager.getInstance().getCloudServerManager().getVmById(vm_id);
+				utilization = vm.getCloudletScheduler().getTotalUtilizationOfCpu(CloudSim.clock());
+				requiredCapacity=((VehicularCpuUtilizationModel) task.getUtilizationModelCpu()).predictUtilization(vm.getVmType());
+				utilization+=requiredCapacity;
+				ram=vm.getVmRam();
+				mips=vm.getVmMips();
+			}
+			task.setAssociatedVmParams(utilization,mips,ram);
+			
 			SimLogger.getInstance().taskAssigned(task.getCloudletId(), task.getAssociatedDatacenterId(),
 					task.getAssociatedHostId(), task.getAssociatedVmId(), vmType.ordinal());
 		}

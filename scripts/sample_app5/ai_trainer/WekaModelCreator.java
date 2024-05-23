@@ -14,16 +14,26 @@ import weka.classifiers.functions.LinearRegression;
 import weka.classifiers.functions.MultilayerPerceptron;
 import weka.classifiers.functions.SMO;
 import weka.classifiers.functions.SMOreg;
+import weka.classifiers.trees.RandomForest;
+//import weka.classifiers.functions.VotedPerceptron;
 import weka.core.Instances;
 import weka.core.converters.ConverterUtils.DataSource;
 
 public class WekaModelCreator {
+//	"edge","cloud_rsu","cloud_gsm"
 	private static final String[] targets = {"edge","cloud_rsu","cloud_gsm"};
+	private static final String[] targets_balance = {"edge_balance","cloud_balance"};
+	private static final String[] methods = {"RandomForest"};
 	
 	public static void main(String[] args) throws Exception {
 		String dataPath = "";
 		String classifier = "";
 		String regressor = "";
+		String regressor_balance = "";
+		String train_balance = "";
+		String train_selector = "";
+		String evaluate_balance = "";
+		String evaluate_selector = "";
 		
 		JSONParser parser = new JSONParser();
         try
@@ -37,6 +47,12 @@ public class WekaModelCreator {
             dataPath = (String) jsonObject.get("sim_result_folder");
             classifier = (String) jsonObject.get("classifier");
             regressor = (String) jsonObject.get("regressor");
+            regressor_balance = (String) jsonObject.get("balance_regressor");
+            train_balance = (String) jsonObject.get("train_balance");
+            train_selector = (String) jsonObject.get("train_selector");
+            evaluate_balance = (String) jsonObject.get("evaluate_balance");
+            evaluate_selector = (String) jsonObject.get("evaluate_selector");      
+            
         }
         catch(Exception e)
         {
@@ -45,16 +61,39 @@ public class WekaModelCreator {
         }
         
 		System.out.println("######### TRAINING FOR " + dataPath + " #########");
-		for(int i=0; i<targets.length; i++) {
-			handleClassify("train", targets[i], classifier, dataPath);
-			handleRegression("train", targets[i], regressor, dataPath);
+		
+		if (train_selector.equals("True")){
+			for(int i=0; i<targets.length; i++) {
+				handleClassify("train", targets[i], classifier, dataPath);
+				handleRegression("train", targets[i], regressor, dataPath);
+			}
 		}
-
+		
+		if (train_balance.equals("True")) {
+			for(int j=0; j<methods.length; j++) {
+				for(int i=0; i<targets_balance.length; i++) {
+					handleRegression("train", targets_balance[i], methods[j], dataPath);
+				}
+			}
+		}
+		
 		System.out.println("######### EVALUATION FOR " + dataPath + " #########");
-		for(int i=0; i<targets.length; i++) {
-			handleClassify("evaluate", targets[i], classifier, dataPath);
-			handleRegression("evaluate", targets[i], regressor, dataPath);
+		
+		if (evaluate_selector.equals("True")) {
+			for(int i=0; i<targets.length; i++) {
+				handleClassify("evaluate", targets[i], classifier, dataPath);
+				handleRegression("evaluate", targets[i], regressor, dataPath);
+			}
 		}
+		
+		if (evaluate_balance.equals("True")) {
+			for(int j=0; j<methods.length; j++) {
+				for(int i=0; i<targets_balance.length; i++) {
+					handleRegression("evaluate", targets_balance[i], methods[j], dataPath);
+				}
+			}
+		}
+		
 	}
 	
 	public static void handleRegression(String action, String target, String method, String dataFolder) throws Exception {
@@ -67,7 +106,7 @@ public class WekaModelCreator {
 			DataSource edgeRegressionSource = new DataSource(dataFolder + "/" + target + "_regression_train.arff");
 			Instances edgeRegressionDataset = edgeRegressionSource.getDataSet();
 			edgeRegressionDataset.setClassIndex(edgeRegressionDataset.numAttributes()-1);
-			
+
 			if(method.equals("LinearRegression")) {
 				LinearRegression lr = new LinearRegression();
 				lr.buildClassifier(edgeRegressionDataset);
@@ -78,10 +117,27 @@ public class WekaModelCreator {
 				smoreg.buildClassifier(edgeRegressionDataset);
 				weka.core.SerializationHelper.write(dataFolder + "/smoreg_" + target + ".model", smoreg);
 			}
+			else if(method.equals("MultilayerPerceptron")) {
+				MultilayerPerceptron mlp = new MultilayerPerceptron();
+				mlp.setLearningRate(0.1);
+				mlp.setMomentum(0.2);
+				mlp.setTrainingTime(1000);
+				mlp.setHiddenLayers("3");
+				mlp.buildClassifier(edgeRegressionDataset);
+				weka.core.SerializationHelper.write(dataFolder + "/mlp_" + target + ".model", mlp);
+			}
+			else if(method.equals("RandomForest")) {
+				
+				RandomForest rf = new RandomForest();
+//				rf.setMaxDepth(1000);
+				rf.setNumIterations(10);
+				rf.buildClassifier(edgeRegressionDataset);
+				weka.core.SerializationHelper.write(dataFolder + "/rf_" + target + ".model", rf);
+			}
 			
 			Date endDate = Calendar.getInstance().getTime();
 			now = df.format(endDate);
-			System.out.println("Training " + method + " for "  + target + " fisished at " + now + ". It took " + getTimeDifference(startDate, endDate));
+			System.out.println("Training " + method + " for "  + target + " finished at " + now + ". It took " + getTimeDifference(startDate, endDate));
 		}
 		else if(action.equals("evaluate")) {
 			System.out.println("Evaluation " + method + " for "  + target + " started");
@@ -104,8 +160,22 @@ public class WekaModelCreator {
 				System.out.println("SMOreg");
 				System.out.println(svmregEval.toSummaryString());
 			}
+			else if(method.equals("MultilayerPerceptron")) {
+				MultilayerPerceptron mlp = (MultilayerPerceptron) weka.core.SerializationHelper.read(dataFolder + "/mlp_" + target + ".model");
+				Evaluation mlpEval = new Evaluation(edgeRegressionDataset);
+				mlpEval.evaluateModel(mlp, edgeRegressionDataset);
+				System.out.println("MultilayerPerceptron");
+				System.out.println(mlpEval.toSummaryString());
+			}
+			else if(method.equals("RandomForest")) {
+				RandomForest rf = (RandomForest) weka.core.SerializationHelper.read(dataFolder + "/rf_" + target + ".model");
+				Evaluation rfEval = new Evaluation(edgeRegressionDataset);
+				rfEval.evaluateModel(rf, edgeRegressionDataset);
+				System.out.println(rfEval.toSummaryString());
+			}
+			
 
-			System.out.println("Evaluation " + method + " for "  + target + " fisished");
+			System.out.println("Evaluation " + method + " for "  + target + " finished");
 			System.out.println("");
 		}
 	}
@@ -134,16 +204,29 @@ public class WekaModelCreator {
 			else if(method.equals("MultilayerPerceptron")) {
 				MultilayerPerceptron mlp = new MultilayerPerceptron();
 				mlp.setLearningRate(0.1);
-				//mlp.setMomentum(0.2);
+//				mlp.setMomentum(0.2);
 				mlp.setTrainingTime(1000);
-				//mlp.setHiddenLayers("3");
+//				mlp.setHiddenLayers("2");
 				mlp.buildClassifier(classifierDataset);
 				weka.core.SerializationHelper.write(dataFolder + "/mlp_" + target + ".model", mlp);
 			}
+//			else if(method.equals("VotedPerceptron")) {
+//				VotedPerceptron vp = new VotedPerceptron();
+//				vp.buildClassifier(classifierDataset);
+//				weka.core.SerializationHelper.write(dataFolder + "/vp_" + target + ".model", vp);
+//			}
+			else if(method.equals("RandomForest")) {
+				RandomForest rf = new RandomForest();
+				rf.setMaxDepth(100);
+				rf.setNumIterations(10);
+				rf.buildClassifier(classifierDataset);
+				weka.core.SerializationHelper.write(dataFolder + "/rf_" + target + ".model", rf);
+			}
+			
 			
 			Date endDate = Calendar.getInstance().getTime();
 			now = df.format(endDate);
-			System.out.println("Training " + method + " for "  + target + " fisished at " + now + ". It took " + getTimeDifference(startDate, endDate));
+			System.out.println("Training " + method + " for "  + target + " finished at " + now + ". It took " + getTimeDifference(startDate, endDate));
 		}
 		else if(action.equals("evaluate")) {
 			System.out.println("Evaluation " + method + " for "  + target + " started");
@@ -176,8 +259,24 @@ public class WekaModelCreator {
 				System.out.println(mlpEval.toMatrixString());
 				System.out.println(mlpEval.toClassDetailsString());
 			}
+//			else if(method.equals("VotedPerceptron")) {
+//				VotedPerceptron vp = (VotedPerceptron) weka.core.SerializationHelper.read(dataFolder + "/vp_" + target + ".model");
+//				Evaluation vpEval = new Evaluation(classifierDataset);
+//				vpEval.evaluateModel(vp, classifierDataset);
+//				System.out.println(vpEval.toSummaryString());
+//				System.out.println(vpEval.toMatrixString());
+//				System.out.println(vpEval.toClassDetailsString());
+//			}
+			else if(method.equals("RandomForest")) {
+				RandomForest rf = (RandomForest) weka.core.SerializationHelper.read(dataFolder + "/rf_" + target + ".model");
+				Evaluation rfEval = new Evaluation(classifierDataset);
+				rfEval.evaluateModel(rf, classifierDataset);
+				System.out.println(rfEval.toSummaryString());
+				System.out.println(rfEval.toMatrixString());
+				System.out.println(rfEval.toClassDetailsString());
+			}
 			
-			System.out.println("Evaluation " + method + " for "  + target + " fisished");
+			System.out.println("Evaluation " + method + " for "  + target + " finished");
 			System.out.println("");
 		}
 	}

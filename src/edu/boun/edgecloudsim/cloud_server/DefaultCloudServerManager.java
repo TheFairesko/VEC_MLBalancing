@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.cloudbus.cloudsim.CloudletScheduler;
 import org.cloudbus.cloudsim.CloudletSchedulerTimeShared;
 import org.cloudbus.cloudsim.Datacenter;
 import org.cloudbus.cloudsim.DatacenterCharacteristics;
@@ -26,14 +27,20 @@ import org.cloudbus.cloudsim.core.CloudSim;
 import org.cloudbus.cloudsim.provisioners.BwProvisionerSimple;
 import org.cloudbus.cloudsim.provisioners.PeProvisionerSimple;
 import org.cloudbus.cloudsim.provisioners.RamProvisionerSimple;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
 import edu.boun.edgecloudsim.core.SimManager;
 import edu.boun.edgecloudsim.core.SimSettings;
+import edu.boun.edgecloudsim.edge_server.EdgeHost;
+import edu.boun.edgecloudsim.edge_server.EdgeVM;
+import edu.boun.edgecloudsim.utils.Location;
 
 public class DefaultCloudServerManager extends CloudServerManager{
 
 	public DefaultCloudServerManager() {
-
 	}
 
 	@Override
@@ -55,26 +62,67 @@ public class DefaultCloudServerManager extends CloudServerManager{
 
 	public void createVmList(int brokerId){
 		//VMs should have unique IDs, so create Cloud VMs after Edge VMs
+//		int vmCounter=SimSettings.getInstance().getNumOfEdgeVMs();
+		
+//		Create VMs for each hosts
+//		for (int i = 0; i < SimSettings.getInstance().getNumOfCloudHost(); i++) {
+//			vmList.add(i, new ArrayList<CloudVM>());
+//			for(int j = 0; j < SimSettings.getInstance().getNumOfCloudVMsPerHost(); j++){
+//				String vmm = "Xen";
+//				int numOfCores = SimSettings.getInstance().getCoreForCloudVM();
+//				double mips = SimSettings.getInstance().getMipsForCloudVM();
+//				int ram = SimSettings.getInstance().getRamForCloudVM();
+//				long storage = SimSettings.getInstance().getStorageForCloudVM();
+//				long bandwidth = 0;
+//				
+//				//VM Parameters		
+//				CloudVM vm = new CloudVM(vmCounter, brokerId, mips, numOfCores, ram, bandwidth, storage, vmm, new CloudletSchedulerTimeShared());
+//				vmList.get(i).add(vm);
+//				vmCounter++;
+//			}
+//		}
+		
+		//VMs should have unique IDs, so create Cloud VMs after Edge VMs
+		int hostCounter=0;
 		int vmCounter=SimSettings.getInstance().getNumOfEdgeVMs();
 		
-		//Create VMs for each hosts
-		for (int i = 0; i < SimSettings.getInstance().getNumOfCloudHost(); i++) {
-			vmList.add(i, new ArrayList<CloudVM>());
-			for(int j = 0; j < SimSettings.getInstance().getNumOfCloudVMsPerHost(); j++){
-				String vmm = "Xen";
-				int numOfCores = SimSettings.getInstance().getCoreForCloudVM();
-				double mips = SimSettings.getInstance().getMipsForCloudVM();
-				int ram = SimSettings.getInstance().getRamForCloudVM();
-				long storage = SimSettings.getInstance().getStorageForCloudVM();
-				long bandwidth = 0;
-				
-				//VM Parameters		
-				CloudVM vm = new CloudVM(vmCounter, brokerId, mips, numOfCores, ram, bandwidth, storage, vmm, new CloudletSchedulerTimeShared());
-				vmList.get(i).add(vm);
-				vmCounter++;
+		Document doc = SimSettings.getInstance().getCloudDevicesDocument();
+		NodeList datacenterList = doc.getElementsByTagName("datacenter");
+		for (int i = 0; i < datacenterList.getLength(); i++) {
+			Node datacenterNode = datacenterList.item(i);
+			Element datacenterElement = (Element) datacenterNode;
+			NodeList hostNodeList = datacenterElement.getElementsByTagName("host");
+			for (int j = 0; j < hostNodeList.getLength(); j++) {
+
+				vmList.add(hostCounter, new ArrayList<CloudVM>());
+
+				Node hostNode = hostNodeList.item(j);
+				Element hostElement = (Element) hostNode;
+				NodeList vmNodeList = hostElement.getElementsByTagName("VM");
+				for (int k = 0; k < vmNodeList.getLength(); k++) {
+					Node vmNode = vmNodeList.item(k);					
+					Element vmElement = (Element) vmNode;
+
+					String vmm = vmElement.getAttribute("vmm");
+					int numOfCores = Integer.parseInt(vmElement.getElementsByTagName("core").item(0).getTextContent());
+					double mips = Double.parseDouble(vmElement.getElementsByTagName("mips").item(0).getTextContent());
+					int ram = Integer.parseInt(vmElement.getElementsByTagName("ram").item(0).getTextContent());
+					long storage = Long.parseLong(vmElement.getElementsByTagName("storage").item(0).getTextContent());
+					long bandwidth = SimSettings.getInstance().getWlanBandwidth() / (hostNodeList.getLength()+vmNodeList.getLength());
+
+					//VM Parameters		
+					CloudVM vm = new CloudVM(vmCounter, brokerId, mips, numOfCores, ram, bandwidth, storage, vmm, new CloudletSchedulerTimeShared());
+					vmList.get(hostCounter).add(vm);
+					vmCounter++;
+				}
+
+				hostCounter++;
 			}
 		}
 	}
+	
+//	CloudVM(int id, int userId, double mips, int numberOfPes, int ram,
+//			long bw, long size, String vmm, CloudletScheduler cloudletScheduler)
 	
 	//average utilization of all VMs
 	public double getAvgUtilization(){
@@ -104,7 +152,7 @@ public class DefaultCloudServerManager extends CloudServerManager{
 		double costPerMem = 0;
 		double costPerStorage = 0;
 		
-		List<Host> hostList=createHosts();
+		List<CloudHost> hostList=createHosts();
 		
 		String name = "CloudDatacenter_" + Integer.toString(index);
 		double time_zone = 3.0;         // time zone this resource located
@@ -126,41 +174,100 @@ public class DefaultCloudServerManager extends CloudServerManager{
 		return datacenter;
 	}
 	
-	private List<Host> createHosts(){
+	private List<CloudHost> createHosts(){
+//		// Here are the steps needed to create a PowerDatacenter:
+//		// 1. We need to create a list to store one or more Machines
+//		List<Host> hostList = new ArrayList<Host>();
+//		
+//		for (int i = 0; i < SimSettings.getInstance().getNumOfCloudHost(); i++) {
+//			int numOfVMPerHost = SimSettings.getInstance().getNumOfCloudVMsPerHost();
+//			int numOfCores = SimSettings.getInstance().getCoreForCloudVM() * numOfVMPerHost;
+//			double mips = SimSettings.getInstance().getMipsForCloudVM() * numOfVMPerHost;
+//			int ram = SimSettings.getInstance().getRamForCloudVM() * numOfVMPerHost;
+//			long storage = SimSettings.getInstance().getStorageForCloudVM() * numOfVMPerHost;
+//			long bandwidth = 0;
+//			
+//			// 2. A Machine contains one or more PEs or CPUs/Cores. Therefore, should
+//			//    create a list to store these PEs before creating
+//			//    a Machine.
+//			List<Pe> peList = new ArrayList<Pe>();
+//
+//			// 3. Create PEs and add these into the list.
+//			//for a quad-core machine, a list of 4 PEs is required:
+//			for(int j=0; j<numOfCores; j++){
+//				peList.add(new Pe(j, new PeProvisionerSimple(mips))); // need to store Pe id and MIPS Rating
+//			}
+//			
+//			//4. Create Hosts with its id and list of PEs and add them to the list of machines
+//			Host host = new Host(
+//					//Hosts should have unique IDs, so create Cloud Hosts after Edge Hosts
+//					i+SimSettings.getInstance().getNumOfEdgeHosts(),
+//					new RamProvisionerSimple(ram),
+//					new BwProvisionerSimple(bandwidth), //kbps
+//					storage,
+//					peList,
+//					new VmSchedulerSpaceShared(peList)
+//				);
+//			hostList.add(host);
+//		}
+//
+//		return hostList;
+		
 		// Here are the steps needed to create a PowerDatacenter:
 		// 1. We need to create a list to store one or more Machines
-		List<Host> hostList = new ArrayList<Host>();
+		List<CloudHost> hostList = new ArrayList<CloudHost>();
 		
-		for (int i = 0; i < SimSettings.getInstance().getNumOfCloudHost(); i++) {
-			int numOfVMPerHost = SimSettings.getInstance().getNumOfCloudVMsPerHost();
-			int numOfCores = SimSettings.getInstance().getCoreForCloudVM() * numOfVMPerHost;
-			double mips = SimSettings.getInstance().getMipsForCloudVM() * numOfVMPerHost;
-			int ram = SimSettings.getInstance().getRamForCloudVM() * numOfVMPerHost;
-			long storage = SimSettings.getInstance().getStorageForCloudVM() * numOfVMPerHost;
-			long bandwidth = 0;
-			
-			// 2. A Machine contains one or more PEs or CPUs/Cores. Therefore, should
-			//    create a list to store these PEs before creating
-			//    a Machine.
-			List<Pe> peList = new ArrayList<Pe>();
-
-			// 3. Create PEs and add these into the list.
-			//for a quad-core machine, a list of 4 PEs is required:
-			for(int j=0; j<numOfCores; j++){
-				peList.add(new Pe(j, new PeProvisionerSimple(mips))); // need to store Pe id and MIPS Rating
+		int hostIdCounter=SimSettings.getInstance().getNumOfEdgeHosts();
+		
+		Document doc = SimSettings.getInstance().getCloudDevicesDocument();
+		NodeList datacenterList = doc.getElementsByTagName("datacenter");
+		for (int i = 0; i < datacenterList.getLength(); i++) {
+			Node datacenterNode = datacenterList.item(i);
+			Element datacenterElement = (Element) datacenterNode;
+		
+			Element location = (Element)datacenterElement.getElementsByTagName("location").item(0);
+			String attractiveness = location.getElementsByTagName("attractiveness").item(0).getTextContent();
+			int wlan_id = Integer.parseInt(location.getElementsByTagName("wlan_id").item(0).getTextContent());
+			int x_pos = Integer.parseInt(location.getElementsByTagName("x_pos").item(0).getTextContent());
+			int y_pos = Integer.parseInt(location.getElementsByTagName("y_pos").item(0).getTextContent());
+			int placeTypeIndex = Integer.parseInt(attractiveness);
+	
+			NodeList hostNodeList = datacenterElement.getElementsByTagName("host");
+			for (int j = 0; j < hostNodeList.getLength(); j++) {
+				Node hostNode = hostNodeList.item(j);
+				
+				Element hostElement = (Element) hostNode;
+				int numOfCores = Integer.parseInt(hostElement.getElementsByTagName("core").item(0).getTextContent());
+				double mips = Double.parseDouble(hostElement.getElementsByTagName("mips").item(0).getTextContent());
+				int ram = Integer.parseInt(hostElement.getElementsByTagName("ram").item(0).getTextContent());
+				long storage = Long.parseLong(hostElement.getElementsByTagName("storage").item(0).getTextContent());
+				long bandwidth = SimSettings.getInstance().getWlanBandwidth() / hostNodeList.getLength();
+				
+				// 2. A Machine contains one or more PEs or CPUs/Cores. Therefore, should
+				//    create a list to store these PEs before creating
+				//    a Machine.
+				List<Pe> peList = new ArrayList<Pe>();
+	
+				// 3. Create PEs and add these into the list.
+				//for a quad-core machine, a list of 4 PEs is required:
+				for(int ind=0; ind<numOfCores; ind++){
+					peList.add(new Pe(ind, new PeProvisionerSimple(mips))); // need to store Pe id and MIPS Rating
+				}
+				
+				//4. Create Hosts with its id and list of PEs and add them to the list of machines
+				CloudHost host = new CloudHost(
+						hostIdCounter,
+						new RamProvisionerSimple(ram),
+						new BwProvisionerSimple(bandwidth), //kbps
+						storage,
+						peList,
+						new VmSchedulerSpaceShared(peList)
+					);
+				
+				host.setPlace(new Location(placeTypeIndex, wlan_id, x_pos, y_pos));
+				hostList.add(host);
+				hostIdCounter++;
 			}
-			
-			//4. Create Hosts with its id and list of PEs and add them to the list of machines
-			Host host = new Host(
-					//Hosts should have unique IDs, so create Cloud Hosts after Edge Hosts
-					i+SimSettings.getInstance().getNumOfEdgeHosts(),
-					new RamProvisionerSimple(ram),
-					new BwProvisionerSimple(bandwidth), //kbps
-					storage,
-					peList,
-					new VmSchedulerSpaceShared(peList)
-				);
-			hostList.add(host);
 		}
 
 		return hostList;

@@ -22,6 +22,9 @@ import java.util.List;
 import org.cloudbus.cloudsim.Datacenter;
 import org.cloudbus.cloudsim.Host;
 import org.cloudbus.cloudsim.VmAllocationPolicy;
+import org.cloudbus.cloudsim.core.CloudSim;
+
+import edu.boun.edgecloudsim.core.SimManager;
 
 public abstract class EdgeServerManager {
 	protected List<Datacenter> localDatacenters;
@@ -34,6 +37,19 @@ public abstract class EdgeServerManager {
 
 	public List<EdgeVM> getVmList(int hostId){
 		return vmList.get(hostId);
+	}
+	
+	public EdgeVM getVmById(int VMId){
+		EdgeVM result=null;
+		for(int hostIndex=0; hostIndex<vmList.size(); hostIndex++){
+			for(int vmIndex=0; vmIndex<vmList.get(hostIndex).size(); vmIndex++){
+				if (vmList.get(hostIndex).get(vmIndex).getId()==VMId) {
+					result=vmList.get(hostIndex).get(vmIndex);
+					break;
+				}
+			}
+		}
+		return result;
 	}
 	
 	public List<Datacenter> getDatacenterList(){

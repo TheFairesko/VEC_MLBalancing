@@ -22,6 +22,7 @@ train_data_ratio = data["train_data_ratio"]
 min_vehicle = data["min_vehicle"]
 max_vehicle = data["max_vehicle"]
 vehicle_step_size = data["vehicle_step_size"]
+z_norm_not_imlement = data["z_norm_not_implement"]
 
 def getDecisionColumnName(target):
     if target == "edge":
@@ -30,24 +31,31 @@ def getDecisionColumnName(target):
         COLUMN_NAME  = "CLOUD_VIA_RSU"
     elif target == "cloud_gsm":
         COLUMN_NAME  = "CLOUD_VIA_GSM"
+    elif target=="edge_balance":
+        COLUMN_NAME  = "EDGE"
+    elif target=="cloud_balance":
+        COLUMN_NAME  = "CLOUD"
     return COLUMN_NAME
 
 def getClassifierColumns(target):
     if target == "edge":
-        result  = ["NumOffloadedTask", "TaskLength", "WLANUploadDelay", "WLANDownloadDelay", "AvgEdgeUtilization", "Result"]
+        result  = ["NumOffloadedTask", "AvgVMUtilization", "Result"]
     elif target == "cloud_rsu":
-        result  = ["NumOffloadedTask", "WANUploadDelay", "WANDownloadDelay", "Result"]
+        result  = ["NumOffloadedTask", "TaskLength", "WANUploadDelay", "WANDownloadDelay", "Result"]
     elif target == "cloud_gsm":
-        result  = ["NumOffloadedTask", "GSMUploadDelay", "GSMDownloadDelay", "Result"]
+        result  = ["NumOffloadedTask", "TaskLength", "GSMUploadDelay", "GSMDownloadDelay", "Result"]
     return result
 
 def getRegressionColumns(target):
+    print(target)
     if target == "edge":
-        result = ["TaskLength", "AvgEdgeUtilization", "ServiceTime"]
+        result = ["TaskLength", "NumOffloadedTask", "ServiceTime"]
     elif target == "cloud_rsu":
-        result = ["TaskLength", "WANUploadDelay", "WANDownloadDelay", "ServiceTime"]
+        result = ["TaskLength", "NumOffloadedTask", "WANUploadDelay", "WANDownloadDelay", "ServiceTime"]
     elif target == "cloud_gsm":
-        result = ["TaskLength", "GSMUploadDelay", "GSMDownloadDelay", "ServiceTime"]
+        result = ["TaskLength", "NumOffloadedTask", "GSMUploadDelay", "GSMDownloadDelay", "ServiceTime"]
+    elif target=="edge_balance" or target=="cloud_balance":
+        result  = ["TaskLength","VMUtilization", "VMMips","VMRam","ProcessingTime"]
     return result
 
 def znorm(column):
@@ -58,22 +66,25 @@ data_set =  []
 
 testDataStartIndex = (train_data_ratio * num_iterations) / 100
 
-for ite in range(num_iterations):
+for ite in range(1,num_iterations+1):
     for vehicle in range(min_vehicle, max_vehicle+1, vehicle_step_size):
         if (datatype == "train" and ite < testDataStartIndex) or (datatype == "test" and ite >= testDataStartIndex):
-            file_name = sim_result_folder + "/ite" + str(ite + 1) + "/" + str(vehicle) + "_learnerOutputFile.cvs"
+            file_name = sim_result_folder + "/ite" + str(ite) + "/" + str(vehicle) + "_learnerOutputFile.cvs"
             df = [pd.read_csv(file_name, na_values = "?", comment='\t', sep=",")]
             df[0]['VehicleCount'] = vehicle
             #print(file_name)
             data_set += df
 
 data_set = pd.concat(data_set, ignore_index=True)
-data_set = data_set[data_set['Decision'] == getDecisionColumnName(target)]
+if target=="cloud_balance":
+    data_set_rsu = data_set[data_set['DecisionForBalance'] == getDecisionColumnName(target)]
+else:
+    data_set = data_set[data_set['Decision'] == getDecisionColumnName(target)]
 
 if method == "classifier":
     targetColumns = getClassifierColumns(target)
 else:
-    targetColumns= getRegressionColumns(target)
+    targetColumns = getRegressionColumns(target)
 
 if datatype == "train":
     print ("##############################################################")
@@ -83,6 +94,10 @@ if datatype == "train":
     train_stats = train_stats.transpose()
     print(train_stats)
     print ("##############################################################")
+
+    f = open(sim_result_folder + "/" + target + "_" + method + "_" + datatype + ".txt", 'w')
+    train_stats.to_csv(f)
+    f.close()
 
 #print("balancing " + target + " for " + method)
 
@@ -110,7 +125,8 @@ else:
 #EXTRACT RELATED ATTRIBUTES
 df = pd.DataFrame(columns=targetColumns)
 for column in targetColumns:
-    if column == 'Result' or column == 'ServiceTime':
+    # column=='ProcessingTime' or column=='EdgeVMUtilization' or column=='EdgeVMRam' or column=="EdgeVMMips"
+    if column == 'Result' or column == 'ServiceTime' or column == 'ProcessingTime' or z_norm_not_imlement=="True":
         df[column] = data_set[column]
     else:
         df[column] = znorm(data_set[column])

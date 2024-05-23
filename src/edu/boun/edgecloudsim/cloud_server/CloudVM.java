@@ -31,6 +31,14 @@ public class CloudVM extends Vm {
 	public SimSettings.VM_TYPES getVmType(){
 		return type;
 	}
+	
+	public double getVmMips(){
+		return super.getMips();
+	}
+	
+	public int getVmRam(){
+		return super.getRam();
+	}
 
 	/**
 	 *  dynamically reconfigures the mips value of a  VM in CloudSim

@@ -25,6 +25,9 @@ public class Task extends Cloudlet {
 	private int hostIndex;
 	private int vmIndex;
 	private int datacenterId;
+	private double associatedVmUtilization;
+	private double associatedVmMips;
+	private int associatedVmRam;
 
 	public Task(int _mobileDeviceId, int cloudletId, long cloudletLength, int pesNumber,
 			long cloudletFileSize, long cloudletOutputSize,
@@ -37,6 +40,24 @@ public class Task extends Cloudlet {
 		
 		mobileDeviceId = _mobileDeviceId;
 		creationTime = CloudSim.clock();
+	}
+	
+	public double getAssociatedVmUtilizaion(){
+		return associatedVmUtilization;
+	}
+	
+	public double getAssociatedVmMips(){
+		return associatedVmMips;
+	}
+
+	public double getAssociatedVmRam(){
+		return associatedVmRam;
+	}
+	
+	public void setAssociatedVmParams(double utilization, double mips, int ram){
+		associatedVmUtilization=utilization;
+		associatedVmMips=mips;
+		associatedVmRam=ram;
 	}
 
 	

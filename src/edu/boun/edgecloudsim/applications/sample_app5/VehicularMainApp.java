@@ -36,16 +36,19 @@ public class VehicularMainApp {
 		SimLogger.enablePrintLog();
 
 		int iterationNumber = 1;
+		
 		String configFile = "";
 		String outputFolder = "";
 		String edgeDevicesFile = "";
+		String cloudDevicesFile = "";
 		String applicationsFile = "";
 		if (args.length == 5){
 			configFile = args[0];
 			edgeDevicesFile = args[1];
-			applicationsFile = args[2];
-			outputFolder = args[3];
-			iterationNumber = Integer.parseInt(args[4]);
+			cloudDevicesFile = args[2];
+			applicationsFile = args[3];
+			outputFolder = args[4];
+			iterationNumber = Integer.parseInt(args[5]);
 		}
 		else{
 			SimLogger.printLine("Simulation setting file, output folder and iteration number are not provided! Using default ones...");
@@ -53,12 +56,13 @@ public class VehicularMainApp {
 			configFile = "scripts/sample_app5/config/" + configName + "_config.properties";
 			applicationsFile = "scripts/sample_app5/config/applications.xml";
 			edgeDevicesFile = "scripts/sample_app5/config/edge_devices.xml";
+			cloudDevicesFile = "scripts/sample_app5/config/cloud_devices.xml";
 			outputFolder = "sim_results/ite" + iterationNumber;
 		}
 
 		//load settings from configuration file
 		SimSettings SS = SimSettings.getInstance();
-		if(SS.initialize(configFile, edgeDevicesFile, applicationsFile) == false) {
+		if(SS.initialize(configFile, edgeDevicesFile, cloudDevicesFile, applicationsFile) == false) {
 			SimLogger.printLine("cannot initialize simulation settings!");
 			System.exit(1);
 		}
@@ -75,7 +79,7 @@ public class VehicularMainApp {
 		SimLogger.printLine("----------------------------------------------------------------------");
 
 		String wekaModelsFolder = configFile.substring(0, configFile.lastIndexOf('/')) + "/weka/";
-		WekaWrapper.getInstance().initialize("MultilayerPerceptron", "LinearRegression", wekaModelsFolder);
+		WekaWrapper.getInstance().initialize("MultilayerPerceptron", "LinearRegression", "RandomForest", wekaModelsFolder);
 
 		for(int i=SS.getMinNumOfMobileDev(); i<=SS.getMaxNumOfMobileDev(); i+=SS.getMobileDevCounterSize())
 			for(int s=0; s<SS.getSimulationScenarios().length; s++)

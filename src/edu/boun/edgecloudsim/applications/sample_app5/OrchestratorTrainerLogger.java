@@ -16,6 +16,7 @@ import edu.boun.edgecloudsim.core.SimManager;
 import edu.boun.edgecloudsim.core.SimSettings;
 import edu.boun.edgecloudsim.edge_client.Task;
 import edu.boun.edgecloudsim.edge_server.EdgeVM;
+import edu.boun.edgecloudsim.cloud_server.CloudVM;
 import edu.boun.edgecloudsim.utils.SimLogger;
 
 public class OrchestratorTrainerLogger {
@@ -29,13 +30,14 @@ public class OrchestratorTrainerLogger {
 	class TrainerItem {
 		int selectedDatacenter;
 		int numOffloadedTask;
-		double avgEdgeUtilization;
+		double avgVMUtilization;
 		double wanUploadDelay;
 		double wanDownloadDelay;
 		double gsmUploadDelay;
 		double gsmDownloadDelay;
 		double wlanUploadDelay;
 		double wlanDownloadDelay;
+//		double edgeVmUtilization;
 
 		TrainerItem(int selectedDatacenter,
 				int numOffloadedTask, double avgEdgeUtilization,
@@ -44,7 +46,7 @@ public class OrchestratorTrainerLogger {
 				double wlanUploadDelay, double wlanDownloadDelay)
 		{
 			this.selectedDatacenter = selectedDatacenter;
-			this.avgEdgeUtilization = avgEdgeUtilization;
+			this.avgVMUtilization = avgEdgeUtilization;
 			this.numOffloadedTask = numOffloadedTask;
 			this.wanUploadDelay = wanUploadDelay;
 			this.wanDownloadDelay = wanDownloadDelay;
@@ -52,6 +54,7 @@ public class OrchestratorTrainerLogger {
 			this.gsmDownloadDelay = gsmDownloadDelay;
 			this.wlanUploadDelay = wlanUploadDelay;
 			this.wlanDownloadDelay = wlanDownloadDelay;
+//			this.edgeVmUtilization = edgeVmUtilization;
 		}
 	}
 
@@ -75,6 +78,7 @@ public class OrchestratorTrainerLogger {
 			learnerBW = new BufferedWriter(learnerFW);
 
 			String line = "Decision"
+					+ DELIMITER + "DecisionForBalance"
 					+ DELIMITER + "Result"
 					+ DELIMITER + "ServiceTime"
 					+ DELIMITER + "ProcessingTime"
@@ -89,11 +93,14 @@ public class OrchestratorTrainerLogger {
 					+ DELIMITER + "GSMDownloadDelay"
 					+ DELIMITER + "WLANUploadDelay"
 					+ DELIMITER + "WLANDownloadDelay"
-					+ DELIMITER + "AvgEdgeUtilization"
-					+ DELIMITER + "NumOffloadedTask";
+					+ DELIMITER + "AvgVMUtilization"
+					+ DELIMITER + "NumOffloadedTask"
+					+ DELIMITER + "VMMips"
+					+ DELIMITER + "VMRam"
+					+ DELIMITER + "VMUtilization";
 
-			//for(int i=1; i<=SimSettings.getInstance().getNumOfEdgeHosts(); i++)
-			//	line += DELIMITER + "Avg Edge(" + i + ") Utilization";
+//			for(int i=1; i<=SimSettings.getInstance().getNumOfEdgeHosts(); i++)
+//				line += DELIMITER + "Edge (" + i + ") Utilization";
 
 			learnerBW.write(line);
 			learnerBW.newLine();
@@ -118,13 +125,13 @@ public class OrchestratorTrainerLogger {
 
 		switch(trainerItem.selectedDatacenter){
 		case VehicularEdgeOrchestrator.EDGE_DATACENTER:
-			line = "EDGE";
+			line = "EDGE" + DELIMITER + "EDGE" ;
 			break;
 		case VehicularEdgeOrchestrator.CLOUD_DATACENTER_VIA_RSU:
-			line = "CLOUD_VIA_RSU";
+			line = "CLOUD_VIA_RSU" + DELIMITER + "CLOUD";
 			break;
 		case VehicularEdgeOrchestrator.CLOUD_DATACENTER_VIA_GSM:
-			line = "CLOUD_VIA_GSM";
+			line = "CLOUD_VIA_GSM" + DELIMITER + "CLOUD";
 			break;
 		default:
 			SimLogger.printLine("Unknown datacenter type");
@@ -149,11 +156,14 @@ public class OrchestratorTrainerLogger {
 				+ DELIMITER + Double.toString(trainerItem.gsmDownloadDelay)
 				+ DELIMITER + Double.toString(trainerItem.wlanUploadDelay)
 				+ DELIMITER + Double.toString(trainerItem.wlanDownloadDelay)
-				+ DELIMITER + Double.toString(trainerItem.avgEdgeUtilization)
-				+ DELIMITER + Integer.toString(trainerItem.numOffloadedTask);
+				+ DELIMITER + Double.toString(trainerItem.avgVMUtilization)
+				+ DELIMITER + Integer.toString(trainerItem.numOffloadedTask)
+				+ DELIMITER + Double.toString(task.getAssociatedVmMips())
+				+ DELIMITER + Double.toString(task.getAssociatedVmRam())
+				+ DELIMITER + Double.toString(task.getAssociatedVmUtilizaion());
 
-		//for(int i=0; i<trainerItem.edgeUtilizations.length; i++)
-		//	line += DELIMITER + Double.toString(trainerItem.edgeUtilizations[i]);
+//		for(int i=0; i<trainerItem.edgeVmUtilizations.length; i++)
+//			line += DELIMITER + Double.toString(trainerItem.edgeVmUtilizations[i]);
 
 		try {
 			learnerBW.write(line);
@@ -171,27 +181,54 @@ public class OrchestratorTrainerLogger {
 
 		addOffloadStat(selectedDatacenter-1);
 		int numOffloadedTasks = getOffloadStat(selectedDatacenter-1);
-
-		int numberOfHost = SimSettings.getInstance().getNumOfEdgeHosts();
-		double totalUtlization = 0;
-		double[] edgeUtilizations = new double[numberOfHost];
-		for(int hostIndex=0; hostIndex<numberOfHost; hostIndex++){
-			List<EdgeVM> vmArray = SimManager.getInstance().getEdgeServerManager().getVmList(hostIndex);
-
-			double utilization=0;
-			for(int vmIndex=0; vmIndex<vmArray.size(); vmIndex++){
-				utilization += vmArray.get(vmIndex).getCloudletScheduler().getTotalUtilizationOfCpu(CloudSim.clock());
+		double avgVMUtilization;
+		
+		if (selectedDatacenter==3) {
+			int numberOfHost = SimSettings.getInstance().getNumOfEdgeHosts();
+			double totalUtlization = 0;
+			double[] edgeUtilizations = new double[numberOfHost];
+			for(int hostIndex=0; hostIndex<numberOfHost; hostIndex++){
+				List<EdgeVM> vmArray = SimManager.getInstance().getEdgeServerManager().getVmList(hostIndex);
+	
+				double utilization=0;
+				for(int vmIndex=0; vmIndex<vmArray.size(); vmIndex++){
+					double utilization_of_i_Vm=vmArray.get(vmIndex).getCloudletScheduler().getTotalUtilizationOfCpu(CloudSim.clock());
+					utilization += utilization_of_i_Vm;
+					
+				}
+				totalUtlization += utilization;
+	
+				edgeUtilizations[hostIndex] = utilization / (double)(vmArray.size());
 			}
-			totalUtlization += utilization;
-
-			edgeUtilizations[hostIndex] = utilization / (double)(vmArray.size());
+			
+	
+			avgVMUtilization = totalUtlization / SimSettings.getInstance().getNumOfEdgeVMs();
 		}
-
-		double avgEdgeUtilization = totalUtlization / SimSettings.getInstance().getNumOfEdgeVMs();
+		else {
+			int numberOfHost = SimSettings.getInstance().getNumOfCloudHost();
+			double totalUtlization = 0;
+			double[] edgeUtilizations = new double[numberOfHost];
+			for(int hostIndex=0; hostIndex<numberOfHost; hostIndex++){
+				List<CloudVM> vmArray = SimManager.getInstance().getCloudServerManager().getVmList(hostIndex);
+	
+				double utilization=0;
+				for(int vmIndex=0; vmIndex<vmArray.size(); vmIndex++){
+					double utilization_of_i_Vm=vmArray.get(vmIndex).getCloudletScheduler().getTotalUtilizationOfCpu(CloudSim.clock());
+					utilization += utilization_of_i_Vm;
+					
+				}
+				totalUtlization += utilization;
+	
+				edgeUtilizations[hostIndex] = utilization / (double)(vmArray.size());
+			}
+			
+	
+			avgVMUtilization = totalUtlization / SimSettings.getInstance().getNumOfCloudVMs();
+		}
 
 		trainerMap.put(id,
 				new TrainerItem(selectedDatacenter,
-						numOffloadedTasks, avgEdgeUtilization,
+						numOffloadedTasks, avgVMUtilization,
 						wanUploadDelay, wanDownloadDelay,
 						gsmUploadDelay, gsmDownloadDelay,
 						wlanUploadDelay, wlanDownloadDelay

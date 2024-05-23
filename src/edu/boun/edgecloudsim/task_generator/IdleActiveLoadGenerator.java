@@ -43,6 +43,7 @@ public class IdleActiveLoadGenerator extends LoadGeneratorModel{
 			expRngList[i][0] = new ExponentialDistribution(SimSettings.getInstance().getTaskLookUpTable()[i][5]);
 			expRngList[i][1] = new ExponentialDistribution(SimSettings.getInstance().getTaskLookUpTable()[i][6]);
 			expRngList[i][2] = new ExponentialDistribution(SimSettings.getInstance().getTaskLookUpTable()[i][7]);
+			
 		}
 		
 		//Each mobile device utilizes an app type (task type)

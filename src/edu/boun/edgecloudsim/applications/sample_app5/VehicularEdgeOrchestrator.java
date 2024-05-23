@@ -12,15 +12,20 @@
 package edu.boun.edgecloudsim.applications.sample_app5;
 
 import java.util.stream.DoubleStream;
+import java.util.List;
 
 import org.cloudbus.cloudsim.Vm;
 import org.cloudbus.cloudsim.core.CloudSim;
 import org.cloudbus.cloudsim.core.SimEvent;
 
+import edu.boun.edgecloudsim.cloud_server.CloudServerManager;
+import edu.boun.edgecloudsim.cloud_server.CloudVM;
 import edu.boun.edgecloudsim.core.SimManager;
 import edu.boun.edgecloudsim.core.SimSettings;
 import edu.boun.edgecloudsim.core.SimSettings.NETWORK_DELAY_TYPES;
 import edu.boun.edgecloudsim.edge_orchestrator.EdgeOrchestrator;
+import edu.boun.edgecloudsim.edge_server.EdgeVM;
+import edu.boun.edgecloudsim.edge_client.CpuUtilizationModel_Custom;
 import edu.boun.edgecloudsim.edge_client.Task;
 import edu.boun.edgecloudsim.utils.SimLogger;
 import edu.boun.edgecloudsim.utils.SimUtils;
@@ -32,6 +37,8 @@ public class VehicularEdgeOrchestrator extends EdgeOrchestrator {
 	public static final int CLOUD_DATACENTER_VIA_GSM = 1;
 	public static final int CLOUD_DATACENTER_VIA_RSU = 2;
 	public static final int EDGE_DATACENTER = 3;
+	public static final int EDGE_DATACENTER_BALANCE = 4;
+	public static final int CLOUD_DATACENTER_BALANCE = 5;
 
 	private int cloudVmCounter;
 	private int edgeVmCounter;
@@ -143,7 +150,9 @@ public class VehicularEdgeOrchestrator extends EdgeOrchestrator {
 				predictedServiceTimeForCloudViaGSM = weka.handleRegression(CLOUD_DATACENTER_VIA_GSM,
 						new double[] {task.getCloudletLength(), gsmUploadDelay, gsmDownloadDelay});
 
-			if(!predictedResultForEdge && !predictedResultForCloudViaRSU && !predictedResultForCloudViaGSM) {
+			if((!predictedResultForEdge && !predictedResultForCloudViaRSU && !predictedResultForCloudViaGSM ) || 
+					(trainerLogger.getOffloadStat(EDGE_DATACENTER-1)>=270 && trainerLogger.getOffloadStat(CLOUD_DATACENTER_VIA_RSU-1)>=230 && 
+					trainerLogger.getOffloadStat(CLOUD_DATACENTER_VIA_RSU-1)>=110))  {
 				double probabilities[] = {0.33, 0.34, 0.33};
 
 				double randomNumber = SimUtils.getRandomDoubleNumber(0, 1);
@@ -236,7 +245,7 @@ public class VehicularEdgeOrchestrator extends EdgeOrchestrator {
 
 				//All Edge VMs are identical, just get MIPS value from the first VM
 				double expectedProcessingDealyOnEdge = task.getCloudletLength() /
-						SimManager.getInstance().getEdgeServerManager().getVmList(0).get(0).getMips();
+						SimSettings.getInstance().getMipsForEdgeVM();;
 
 				double[] expectedDelays = {
 						wlanUploadDelay + wlanDownloadDelay + expectedProcessingDealyOnEdge,
@@ -252,7 +261,7 @@ public class VehicularEdgeOrchestrator extends EdgeOrchestrator {
 		else if (policy.equals("GAME_THEORY")) {
 			//All Edge VMs are identical, just get MIPS value from the first VM
 			double expectedProcessingDealyOnEdge = task.getCloudletLength() /
-					SimManager.getInstance().getEdgeServerManager().getVmList(0).get(0).getMips();
+					SimSettings.getInstance().getMipsForEdgeVM();;
 
 			expectedProcessingDealyOnEdge *= 100 / (100 - avgEdgeUtilization);
 
@@ -357,30 +366,90 @@ public class VehicularEdgeOrchestrator extends EdgeOrchestrator {
 	@Override
 	public Vm getVmToOffload(Task task, int deviceId) {
 		Vm selectedVM = null;
+		String method=SimSettings.getInstance().getBalancePolicy();
 
 		if (deviceId == CLOUD_DATACENTER_VIA_GSM || deviceId == CLOUD_DATACENTER_VIA_RSU) {
-			int numOfCloudHosts = SimSettings.getInstance().getNumOfCloudHost();
-			int hostIndex = (cloudVmCounter / numOfCloudHosts) % numOfCloudHosts;
-			int vmIndex = cloudVmCounter % SimSettings.getInstance().getNumOfCloudVMsPerHost();;
+			if (method.equals("ROUND_ROBIN")) {
+				int numOfCloudHosts = SimSettings.getInstance().getNumOfCloudHost();
 
-			selectedVM = SimManager.getInstance().getCloudServerManager().getVmList(hostIndex).get(vmIndex);
-
-			cloudVmCounter++;
-			cloudVmCounter = cloudVmCounter % SimSettings.getInstance().getNumOfCloudVMs();
+				int hostIndex = (cloudVmCounter / numOfCloudHosts) % numOfCloudHosts;
+				int vmIndex = cloudVmCounter % SimSettings.getInstance().getNumOfCloudVMsPerHost();
+				SimLogger.printLine(Integer.toString(SimSettings.getInstance().getNumOfCloudVMs()));
+	
+				selectedVM = SimManager.getInstance().getCloudServerManager().getVmList(hostIndex).get(vmIndex);
+	
+				cloudVmCounter++;
+				cloudVmCounter = cloudVmCounter % SimSettings.getInstance().getNumOfCloudVMs();
+			}
+			else if (method.equals("ML")){
+				
+				int numOfCloudHosts = SimSettings.getInstance().getNumOfCloudHost();
+				
+				WekaWrapper weka = WekaWrapper.getInstance();
+				double minTime = Double.MAX_VALUE;
+				
+				for(int hostIndex=0; hostIndex<numOfCloudHosts; hostIndex++){
+					List<CloudVM> vmArray = SimManager.getInstance().getCloudServerManager().getVmList(hostIndex);
+					for(int vmIndex=0; vmIndex<vmArray.size(); vmIndex++){
+						double requiredCapacity = ((VehicularCpuUtilizationModel) task.getUtilizationModelCpu()).predictUtilization(vmArray.get(vmIndex).getVmType());
+						double targetVmCapacity = (double)100 - vmArray.get(vmIndex).getCloudletScheduler().getTotalUtilizationOfCpu(CloudSim.clock());
+						
+						if(requiredCapacity <= targetVmCapacity){
+							double predictedTime = weka.handleRegression(CLOUD_DATACENTER_BALANCE,
+									new double[] {task.getCloudletLength(), vmArray.get(vmIndex).getCloudletScheduler().getTotalUtilizationOfCpu(CloudSim.clock())+requiredCapacity,task.getAssociatedVmMips(),task.getAssociatedVmRam()});
+							if (predictedTime<minTime) {
+								selectedVM = vmArray.get(vmIndex);
+								minTime=predictedTime;
+							}
+						}
+						
+					}
+				}
+			}
 
 		}
 		else if (deviceId == EDGE_DATACENTER) {
-			int numOfEdgeVMs = SimSettings.getInstance().getNumOfEdgeVMs();
-			int numOfEdgeHosts = SimSettings.getInstance().getNumOfEdgeHosts();
-			int vmPerHost = numOfEdgeVMs / numOfEdgeHosts;
-
-			int hostIndex = (edgeVmCounter / vmPerHost) % numOfEdgeHosts;
-			int vmIndex = edgeVmCounter % vmPerHost;
-
-			selectedVM = SimManager.getInstance().getEdgeServerManager().getVmList(hostIndex).get(vmIndex);
-
-			edgeVmCounter++;
-			edgeVmCounter = edgeVmCounter % numOfEdgeVMs;
+			if (method.equals("ROUND_ROBIN")){
+				int numOfEdgeVMs = SimSettings.getInstance().getNumOfEdgeVMs();
+				
+				int numOfEdgeHosts = SimSettings.getInstance().getNumOfEdgeHosts();
+				int vmPerHost = numOfEdgeVMs / numOfEdgeHosts;
+	
+				int hostIndex = (edgeVmCounter / vmPerHost) % numOfEdgeHosts;
+				int vmIndex = edgeVmCounter % vmPerHost;
+	
+				selectedVM = SimManager.getInstance().getEdgeServerManager().getVmList(hostIndex).get(vmIndex);
+	
+				edgeVmCounter++;
+				edgeVmCounter = edgeVmCounter % numOfEdgeVMs;
+			}
+			else if (method.equals("ML")){
+				int numOfEdgeHosts = SimSettings.getInstance().getNumOfEdgeHosts();
+				double minTime = Double.MAX_VALUE;
+				
+				WekaWrapper weka = WekaWrapper.getInstance();
+				
+				
+				for(int hostIndex=0; hostIndex<numOfEdgeHosts; hostIndex++){
+					List<EdgeVM> vmArray = SimManager.getInstance().getEdgeServerManager().getVmList(hostIndex);
+					for(int vmIndex=0; vmIndex<vmArray.size(); vmIndex++){
+						double requiredCapacity = ((VehicularCpuUtilizationModel) task.getUtilizationModelCpu()).predictUtilization(vmArray.get(vmIndex).getVmType());
+						double targetVmCapacity = (double)100 - vmArray.get(vmIndex).getCloudletScheduler().getTotalUtilizationOfCpu(CloudSim.clock());
+						
+						
+//						double combinedLoad = 2*((targetVmCapacity-requiredCapacity)/100) * predictedTime/(requiredCapacity+predictedTime);
+						if(requiredCapacity <= targetVmCapacity){
+							double predictedTime = weka.handleRegression(EDGE_DATACENTER_BALANCE,
+									new double[] {task.getCloudletLength(), vmArray.get(vmIndex).getCloudletScheduler().getTotalUtilizationOfCpu(CloudSim.clock())+requiredCapacity,task.getAssociatedVmMips(),task.getAssociatedVmRam()});
+							if (predictedTime<minTime) {
+								selectedVM = vmArray.get(vmIndex);
+								minTime=predictedTime;
+							}
+						}
+						
+					}
+				}
+			}
 		}
 		else {
 			SimLogger.printLine("Unknow device id! Terminating simulation...");

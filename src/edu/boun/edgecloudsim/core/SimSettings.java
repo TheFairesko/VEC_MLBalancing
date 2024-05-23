@@ -32,6 +32,7 @@ import edu.boun.edgecloudsim.utils.SimLogger;
 public class SimSettings {
 	private static SimSettings instance = null;
 	private Document edgeDevicesDoc = null;
+	private Document cloudDevicesDoc = null;
 
 	public static final double CLIENT_ACTIVITY_START_TIME = 10;
 
@@ -57,16 +58,16 @@ public class SimSettings {
 	private double INTERVAL_TO_GET_AP_DELAY_LOG; //minutes unit in properties file
 	private boolean FILE_LOG_ENABLED; //boolean to check file logging option
 	private boolean DEEP_FILE_LOG_ENABLED; //boolean to check deep file logging option
+	private String BALANCE_POLICY;
 
 	private int MIN_NUM_OF_MOBILE_DEVICES;
 	private int MAX_NUM_OF_MOBILE_DEVICES;
 	private int MOBILE_DEVICE_COUNTER_SIZE;
 	private int WLAN_RANGE;
 
-	private int NUM_OF_EDGE_DATACENTERS;
-	private int NUM_OF_EDGE_HOSTS;
-	private int NUM_OF_EDGE_VMS;
-	private int NUM_OF_PLACE_TYPES;
+	private int NUM_OF_EDGE_DATACENTERS=0;
+	private int NUM_OF_EDGE_HOSTS=0;
+	private int NUM_OF_EDGE_VMS=0;
 
 	private double WAN_PROPAGATION_DELAY; //seconds unit in properties file
 	private double GSM_PROPAGATION_DELAY; //seconds unit in properties file
@@ -75,13 +76,17 @@ public class SimSettings {
 	private int BANDWITH_MAN; //Mbps unit in properties file
 	private int BANDWITH_WAN; //Mbps unit in properties file
 	private int BANDWITH_GSM; //Mbps unit in properties file
-
-	private int NUM_OF_HOST_ON_CLOUD_DATACENTER;
-	private int NUM_OF_VM_ON_CLOUD_HOST;
-	private int CORE_FOR_CLOUD_VM;
-	private int MIPS_FOR_CLOUD_VM; //MIPS
-	private int RAM_FOR_CLOUD_VM; //MB
-	private int STORAGE_FOR_CLOUD_VM; //Byte
+	
+	private int NUM_OF_DATACENTERS_ON_CLOUD=0;
+	private int NUM_OF_HOST_ON_CLOUD_DATACENTER=0;
+	private int NUM_OF_VM_ON_CLOUD_HOST=0;
+	private int NUM_OF_PLACE_TYPES=0;
+//	private int CORE_FOR_CLOUD_VM;
+	private int MIPS_FOR_CLOUD_VM=0; //MIPS
+//	private int RAM_FOR_CLOUD_VM; //MB
+//	private int STORAGE_FOR_CLOUD_VM; //Byte
+	
+	private int MIPS_FOR_EDGE_VM=0; //MIPS
 
 	private int CORE_FOR_VM;
 	private int MIPS_FOR_VM; //MIPS
@@ -133,7 +138,7 @@ public class SimSettings {
 	 * @param propertiesFile
 	 * @return
 	 */
-	public boolean initialize(String propertiesFile, String edgeDevicesFile, String applicationsFile){
+	public boolean initialize(String propertiesFile, String edgeDevicesFile, String cloudDevicesFile, String applicationsFile){
 		boolean result = false;
 		InputStream input = null;
 		try {
@@ -150,6 +155,7 @@ public class SimSettings {
 			INTERVAL_TO_GET_AP_DELAY_LOG = (double)60 * Double.parseDouble(prop.getProperty("ap_delay_check_interval", "0")); //seconds		
 			FILE_LOG_ENABLED = Boolean.parseBoolean(prop.getProperty("file_log_enabled"));
 			DEEP_FILE_LOG_ENABLED = Boolean.parseBoolean(prop.getProperty("deep_file_log_enabled"));
+			BALANCE_POLICY = prop.getProperty("balance_policy");
 
 			MIN_NUM_OF_MOBILE_DEVICES = Integer.parseInt(prop.getProperty("min_number_of_mobile_devices"));
 			MAX_NUM_OF_MOBILE_DEVICES = Integer.parseInt(prop.getProperty("max_number_of_mobile_devices"));
@@ -164,12 +170,12 @@ public class SimSettings {
 			BANDWITH_WAN = 1000 * Integer.parseInt(prop.getProperty("wan_bandwidth", "0"));
 			BANDWITH_GSM =  1000 * Integer.parseInt(prop.getProperty("gsm_bandwidth", "0"));
 
-			NUM_OF_HOST_ON_CLOUD_DATACENTER = Integer.parseInt(prop.getProperty("number_of_host_on_cloud_datacenter"));
-			NUM_OF_VM_ON_CLOUD_HOST = Integer.parseInt(prop.getProperty("number_of_vm_on_cloud_host"));
-			CORE_FOR_CLOUD_VM = Integer.parseInt(prop.getProperty("core_for_cloud_vm"));
-			MIPS_FOR_CLOUD_VM = Integer.parseInt(prop.getProperty("mips_for_cloud_vm"));
-			RAM_FOR_CLOUD_VM = Integer.parseInt(prop.getProperty("ram_for_cloud_vm"));
-			STORAGE_FOR_CLOUD_VM = Integer.parseInt(prop.getProperty("storage_for_cloud_vm"));
+//			NUM_OF_HOST_ON_CLOUD_DATACENTER = Integer.parseInt(prop.getProperty("number_of_host_on_cloud_datacenter"));
+//			NUM_OF_VM_ON_CLOUD_HOST = Integer.parseInt(prop.getProperty("number_of_vm_on_cloud_host"));
+//			CORE_FOR_CLOUD_VM = Integer.parseInt(prop.getProperty("core_for_cloud_vm"));
+//			MIPS_FOR_CLOUD_VM = Integer.parseInt(prop.getProperty("mips_for_cloud_vm"));
+//			RAM_FOR_CLOUD_VM = Integer.parseInt(prop.getProperty("ram_for_cloud_vm"));
+//			STORAGE_FOR_CLOUD_VM = Integer.parseInt(prop.getProperty("storage_for_cloud_vm"));
 
 			RAM_FOR_VM = Integer.parseInt(prop.getProperty("ram_for_mobile_vm"));
 			CORE_FOR_VM = Integer.parseInt(prop.getProperty("core_for_mobile_vm"));
@@ -212,6 +218,7 @@ public class SimSettings {
 		}
 		parseApplicationsXML(applicationsFile);
 		parseEdgeDevicesXML(edgeDevicesFile);
+		parseCloudDevicesXML(cloudDevicesFile);
 
 		return result;
 	}
@@ -221,6 +228,14 @@ public class SimSettings {
 	 */
 	public Document getEdgeDevicesDocument(){
 		return edgeDevicesDoc;
+	}
+	
+	public Document getCloudDevicesDocument(){
+		return cloudDevicesDoc;
+	}
+	
+	public String getBalancePolicy(){
+		return BALANCE_POLICY;
 	}
 
 
@@ -428,10 +443,10 @@ public class SimSettings {
 	/**
 	 * returns the number of cores for cloud VMs
 	 */
-	public int getCoreForCloudVM()
-	{
-		return CORE_FOR_CLOUD_VM;
-	}
+//	public int getCoreForCloudVM()
+//	{
+//		return CORE_FOR_CLOUD_VM;
+//	}
 
 	/**
 	 * returns MIPS of the central cloud VMs
@@ -440,22 +455,27 @@ public class SimSettings {
 	{
 		return MIPS_FOR_CLOUD_VM;
 	}
+	
+	public int getMipsForEdgeVM()
+	{
+		return MIPS_FOR_EDGE_VM;
+	}
 
 	/**
 	 * returns RAM of the central cloud VMs
 	 */
-	public int getRamForCloudVM()
-	{
-		return RAM_FOR_CLOUD_VM;
-	}
+//	public int getRamForCloudVM()
+//	{
+//		return RAM_FOR_CLOUD_VM;
+//	}
 
 	/**
 	 * returns Storage of the central cloud VMs
 	 */
-	public int getStorageForCloudVM()
-	{
-		return STORAGE_FOR_CLOUD_VM;
-	}
+//	public int getStorageForCloudVM()
+//	{
+//		return STORAGE_FOR_CLOUD_VM;
+//	}
 
 	/**
 	 * returns RAM of the mobile (processing unit) VMs
@@ -725,12 +745,93 @@ public class SimSettings {
 						isElementPresent(vmElement, "mips");
 						isElementPresent(vmElement, "ram");
 						isElementPresent(vmElement, "storage");
+						
+						String value = vmElement.getElementsByTagName("mips").item(0).getTextContent();
+//						SimLogger.printLine(value);
+						MIPS_FOR_EDGE_VM+=Double.parseDouble(value);
 					}
 				}
 			}
+			
+		MIPS_FOR_EDGE_VM=MIPS_FOR_EDGE_VM/NUM_OF_EDGE_VMS;
 
 		} catch (Exception e) {
 			SimLogger.printLine("Edge Devices XML cannot be parsed! Terminating simulation...");
+			e.printStackTrace();
+			System.exit(1);
+		}
+	}
+	
+	private void parseCloudDevicesXML(String filePath)
+	{
+		try {	
+			File devicesFile = new File(filePath);
+			DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+			DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
+			cloudDevicesDoc = dBuilder.parse(devicesFile);
+			cloudDevicesDoc.getDocumentElement().normalize();
+
+			NodeList datacenterList = cloudDevicesDoc.getElementsByTagName("datacenter");
+			for (int i = 0; i < datacenterList.getLength(); i++) {
+				NUM_OF_DATACENTERS_ON_CLOUD++;
+				Node datacenterNode = datacenterList.item(i);
+
+				Element datacenterElement = (Element) datacenterNode;
+				isAttributePresent(datacenterElement, "arch");
+				isAttributePresent(datacenterElement, "os");
+				isAttributePresent(datacenterElement, "vmm");
+				isElementPresent(datacenterElement, "costPerBw");
+				isElementPresent(datacenterElement, "costPerSec");
+				isElementPresent(datacenterElement, "costPerMem");
+				isElementPresent(datacenterElement, "costPerStorage");
+
+				Element location = (Element)datacenterElement.getElementsByTagName("location").item(0);
+				isElementPresent(location, "attractiveness");
+				isElementPresent(location, "wlan_id");
+				isElementPresent(location, "x_pos");
+				isElementPresent(location, "y_pos");
+
+				String attractiveness = location.getElementsByTagName("attractiveness").item(0).getTextContent();
+				int placeTypeIndex = Integer.parseInt(attractiveness);
+				if(NUM_OF_PLACE_TYPES < placeTypeIndex+1)
+					NUM_OF_PLACE_TYPES = placeTypeIndex+1;
+
+				NodeList hostList = datacenterElement.getElementsByTagName("host");
+				for (int j = 0; j < hostList.getLength(); j++) {
+					NUM_OF_HOST_ON_CLOUD_DATACENTER++;
+					Node hostNode = hostList.item(j);
+
+					Element hostElement = (Element) hostNode;
+					isElementPresent(hostElement, "core");
+					isElementPresent(hostElement, "mips");
+					isElementPresent(hostElement, "ram");
+					isElementPresent(hostElement, "storage");
+
+					NodeList vmList = hostElement.getElementsByTagName("VM");
+					for (int k = 0; k < vmList.getLength(); k++) {
+						NUM_OF_VM_ON_CLOUD_HOST++;
+						Node vmNode = vmList.item(k);
+
+						Element vmElement = (Element) vmNode;
+						isAttributePresent(vmElement, "vmm");
+						isElementPresent(vmElement, "core");
+						isElementPresent(vmElement, "mips");
+						isElementPresent(vmElement, "ram");
+						isElementPresent(vmElement, "storage");
+						
+						String value = vmElement.getElementsByTagName("mips").item(0).getTextContent();
+//						SimLogger.printLine(value);
+						MIPS_FOR_CLOUD_VM+=Double.parseDouble(value);
+						
+					}
+				}
+				
+			}
+			
+			MIPS_FOR_CLOUD_VM=MIPS_FOR_CLOUD_VM/NUM_OF_VM_ON_CLOUD_HOST;
+
+		} catch (Exception e) {
+			SimLogger.printLine("Cloud Devices XML cannot be parsed! Terminating simulation...");
 			e.printStackTrace();
 			System.exit(1);
 		}

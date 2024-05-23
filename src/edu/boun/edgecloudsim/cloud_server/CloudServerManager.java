@@ -23,6 +23,9 @@ import org.cloudbus.cloudsim.Datacenter;
 import org.cloudbus.cloudsim.Host;
 import org.cloudbus.cloudsim.VmAllocationPolicy;
 
+import edu.boun.edgecloudsim.core.SimManager;
+import edu.boun.edgecloudsim.edge_server.EdgeVM;
+
 public abstract class CloudServerManager {
 	protected Datacenter localDatacenter;
 	protected List<List<CloudVM>> vmList;
@@ -33,6 +36,19 @@ public abstract class CloudServerManager {
 
 	public List<CloudVM> getVmList(int hostId){
 		return vmList.get(hostId);
+	}
+	
+	public CloudVM getVmById(int VMId){
+		CloudVM result=null;
+		for(int hostIndex=0; hostIndex<vmList.size(); hostIndex++){
+			for(int vmIndex=0; vmIndex<vmList.get(hostIndex).size(); vmIndex++){
+				if (vmList.get(hostIndex).get(vmIndex).getId()==VMId) {
+					result=vmList.get(hostIndex).get(vmIndex);
+					break;
+				}
+			}
+		}
+		return result;
 	}
 	
 	public Datacenter getDatacenter(){

@@ -1,0 +1,145 @@
+<?xml version="1.0"?>
+<cloud_devices>
+	<datacenter arch="x86" os="Linux" vmm="Xen">
+		<costPerBw>0</costPerBw>
+		<costPerSec>0</costPerSec>
+		<costPerMem>0</costPerMem>
+		<costPerStorage>0</costPerStorage>
+		<location>
+			<x_pos>200</x_pos>
+			<y_pos>0</y_pos>
+			<wlan_id>0</wlan_id>
+			<attractiveness>2</attractiveness>
+		</location>
+		<hosts>
+			<host>
+				<core>40</core>
+				<mips>1530000</mips>
+				<ram>174000</ram>
+				<storage>2500000</storage>
+				<VMs>
+					<VM vmm="Xen">
+						<core>2</core>
+						<mips>90000</mips>
+						<ram>16000</ram>
+						<storage>125000</storage>
+					</VM>
+					<VM vmm="Xen">
+						<core>2</core>
+						<mips>75000</mips>
+						<ram>8000</ram>
+						<storage>125000</storage>
+					</VM>
+					<VM vmm="Xen">
+						<core>2</core>
+						<mips>75000</mips>
+						<ram>8000</ram>
+						<storage>125000</storage>
+					</VM>
+					<VM vmm="Xen">
+						<core>2</core>
+						<mips>75000</mips>
+						<ram>8000</ram>
+						<storage>125000</storage>
+					</VM>
+					<VM vmm="Xen">
+						<core>2</core>
+						<mips>75000</mips>
+						<ram>8000</ram>
+						<storage>125000</storage>
+					</VM>
+					<VM vmm="Xen">
+						<core>2</core>
+						<mips>75000</mips>
+						<ram>8000</ram>
+						<storage>125000</storage>
+					</VM>
+					<VM vmm="Xen">
+						<core>2</core>
+						<mips>100000</mips>
+						<ram>16000</ram>
+						<storage>125000</storage>
+					</VM>
+					<VM vmm="Xen">
+						<core>2</core>
+						<mips>75000</mips>
+						<ram>8000</ram>
+						<storage>125000</storage>
+					</VM>
+					<VM vmm="Xen">
+						<core>2</core>
+						<mips>75000</mips>
+						<ram>8000</ram>
+						<storage>125000</storage>
+					</VM>
+					<VM vmm="Xen">
+						<core>2</core>
+						<mips>75000</mips>
+						<ram>8000</ram>
+						<storage>125000</storage>
+					</VM>
+					<VM vmm="Xen">
+						<core>2</core>
+						<mips>75000</mips>
+						<ram>8000</ram>
+						<storage>125000</storage>
+					</VM>
+					<VM vmm="Xen">
+						<core>2</core>
+						<mips>75000</mips>
+						<ram>8000</ram>
+						<storage>125000</storage>
+					</VM>
+					<VM vmm="Xen">
+						<core>2</core>
+						<mips>75000</mips>
+						<ram>8000</ram>
+						<storage>125000</storage>
+					</VM>
+					<VM vmm="Xen">
+						<core>2</core>
+						<mips>75000</mips>
+						<ram>8000</ram>
+						<storage>125000</storage>
+					</VM>
+					<VM vmm="Xen">
+						<core>2</core>
+						<mips>75000</mips>
+						<ram>8000</ram>
+						<storage>125000</storage>
+					</VM>
+					<VM vmm="Xen">
+						<core>2</core>
+						<mips>75000</mips>
+						<ram>8000</ram>
+						<storage>125000</storage>
+					</VM>
+					<VM vmm="Xen">
+						<core>2</core>
+						<mips>75000</mips>
+						<ram>8000</ram>
+						<storage>125000</storage>
+					</VM>
+					<VM vmm="Xen">
+						<core>2</core>
+						<mips>75000</mips>
+						<ram>8000</ram>
+						<storage>125000</storage>
+					</VM>
+					<VM vmm="Xen">
+						<core>2</core>
+						<mips>65000</mips>
+						<ram>6000</ram>
+						<storage>125000</storage>
+					</VM>
+					<VM vmm="Xen">
+						<core>2</core>
+						<mips>75000</mips>
+						<ram>8000</ram>
+						<storage>125000</storage>
+					</VM>
+				</VMs>
+			</host>
+		</hosts>
+	</datacenter>
+</cloud_devices>
